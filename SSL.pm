@@ -17,6 +17,8 @@ HTTP::Daemon::SSL - a simple http server class with SSL support
   use HTTP::Daemon::SSL;
   use HTTP::Status;
 
+  # Make sure you have a certs/ directory with "server-cert.pem"
+  # and "server-key.pem" in it before running this!
   my $d = HTTP::Daemon::SSL->new || die;
   print "Please contact me at: <URL:", $d->url, ">\n";
   while (my $c = $d->accept) {
@@ -69,16 +71,19 @@ use vars qw($VERSION @ISA $PROTO $DEBUG);
 use IO::Socket::SSL;
 use HTTP::Daemon;
 
-$VERSION = "1.01";
+$VERSION = "1.02";
 @ISA = qw(IO::Socket::SSL HTTP::Daemon);
 
 =item $d = new HTTP::Daemon::SSL
 
 The constructor takes the same parameters as the
 I<IO::Socket::SSL> constructor.  It can also be called without specifying
-any parameters. The daemon will then set up a listen queue of 5
-connections and allocate some random port number.  A server that wants
-to bind to some specific address on the standard HTTPS port will be
+any parameters, but you will have to make sure that you have an SSL certificate
+and key for the server in F<certs/server-cert.pem> and F<certs/server-key.pem>.
+See the IO::Socket::SSL documentation for how to change these default locations
+and specify many other aspects of SSL behavior. The daemon will then set up a
+listen queue of 5 connections and allocate some random port number.  A server
+that wants to bind to some specific address on the standard HTTPS port will be
 constructed like this:
 
   $d = new HTTP::Daemon::SSL
@@ -101,18 +106,33 @@ sub accept
     my $self = shift;
     my $pkg = shift || "HTTP::Daemon::ClientConn::SSL";
     while (1) {
-	if (my $sock = IO::Socket::SSL::accept($self,$pkg)) {
-	    ${*$sock}{'httpd_daemon'} = $self;
-	    return $sock;
-	}
+	my $sock = IO::Socket::SSL::accept($self,$pkg);
+	${*$sock}{'httpd_daemon'} = $self if ($sock);
+	return $sock if ($sock || $self->errstr =~ /^IO::Socket[^\n]* accept failed$/);
     }
+}
+
+sub _default_port { 443; }
+sub _default_scheme { "https"; }
+
+sub url
+{
+    my $self = shift;
+    my $url = $self->SUPER::url;
+    return $url if ($self->can("HTTP::Daemon::_default_port"));
+    
+    # Workaround for old versions of HTTP::Daemon
+    $url =~ s!^http:!https:!;
+    $url =~ s!/$!:80/! unless ($url =~ m!:(?:\d+)/$!);
+    $url =~ s!:443/$!/!;
+    return $url;
 }
 
 
 package HTTP::Daemon::SSL::DummyDaemon;
 use vars qw(@ISA);
 @ISA = qw(HTTP::Daemon);
-sub new { my $ref = [];  bless $ref => shift; }
+sub new { bless [], shift; }
 
 package HTTP::Daemon::SSL;
 
@@ -120,9 +140,11 @@ sub ssl_error {
     my ($self, $error) = @_;
     ${*$self}{'httpd_client_proto'} = 1000;
     ${*$self}{'httpd_daemon'} = new HTTP::Daemon::SSL::DummyDaemon;
-    $self->send_error(400, "Your browser attempted to make an unencrypted\n ".
+    if ($error =~ /http/i and $self->opened) {
+	$self->send_error(400, "Your browser attempted to make an unencrypted\n ".
 		      "request to this server, which is not allowed.  Try using\n ".
 		      "HTTPS instead.\n");
+    }
     $self->kill_socket;
 }
 
@@ -169,7 +191,7 @@ L<IO::Socket::SSL>, L<HTTP::Daemon>, L<Apache>
 =head1 COPYRIGHT
 
 Code and documentation from HTTP::Daemon Copyright 1996-2001, Gisle Aas
-Changes Copyright 2003, Peter Behroozi
+Changes Copyright 2003-2004, Peter Behroozi
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

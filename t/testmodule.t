@@ -7,7 +7,7 @@ use HTTP::Status;
 eval {require "t/ssl_settings.req";} ||
 eval {require "ssl_settings.req";};
 
-$numtests = 7;
+$numtests = 8;
 $|=1;
 $SIG{PIPE}='IGNORE';
 
@@ -30,7 +30,8 @@ unless (fork) {
 
     print $client "GET / HTTP/1.0\r\n\r\n";
     (<$client> eq "HTTP/1.1 400 Bad Request\r\n") || print "not ";
-    &ok("client");
+    &ok("client bad connection test");
+    my @ary = <$client>;
     close $client;
 
     $client = new IO::Socket::SSL(PeerAddr => $SSL_SERVER_ADDR,
@@ -39,12 +40,13 @@ unless (fork) {
 				  SSL_ca_file => "certs/test-ca.pem");
 
     $client || (print("not ok #client failure\n") && exit);
-    &ok("client");
+    &ok("client good connection test");
 
     print $client "GET /foo HTTP/1.0\r\n\r\n";
 
     (<$client> eq "HTTP/1.1 403 Forbidden\r\n") || print "not ";
-    &ok("client");
+    &ok("client permission test");
+    @ary = <$client>;
 
     exit(0);
 }
@@ -63,10 +65,13 @@ if (!$server) {
     print "not ok $test\n";
     exit;
 }
-&ok("server");
+&ok("server init");
 
 print "not " if (!defined fileno($server));
-&ok("server");
+&ok("server fileno");
+
+print "not " unless ($server->url =~ m!^https:!);
+&ok("server url test");
 
 my $client = $server->accept;
 
@@ -74,14 +79,14 @@ if (!$client) {
     print "not ok # no client\n";
     exit;
 }
-&ok("server");
+&ok("server accept");
 
 my $r = $client->get_request();
 
 unless ($r->method eq 'GET' and $r->url->path eq '/foo') {
     print "not ";
 }
-&ok("server");
+&ok("server method processing");
 
 $client->send_error(RC_FORBIDDEN);
 
