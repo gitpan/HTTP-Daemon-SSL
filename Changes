@@ -1,2 +1,10 @@
-v1.0
+v1.01
+	- Patch from Evgeniy Pirogov <epirogov at tucows.com> to fix
+	  read issues when a client and server have different timeouts.
+	- Fixed the README to actually deal with HTTP::Daemon::SSL
+	  instead of IO::Socket::SSL
+
+--- Old Versions --------------------------------------------------
+
+v1.00  2003.7.24
 	- Initial public release.
