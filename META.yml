@@ -1,13 +1,12 @@
---- #YAML:1.0
-name:                HTTP-Daemon-SSL
-version:             1.03_02
-abstract:            ~
-license:             ~
-generated_by:        ExtUtils::MakeMaker version 6.32
-distribution_type:   module
-requires:     
+# http://module-build.sourceforge.net/META-spec.html
+name:         HTTP-Daemon-SSL
+version:      1.04
+version_from: SSL.pm
+installdirs:  site
+license:      perl
+requires:
     HTTP::Daemon:                  1
     IO::Socket::SSL:               0.93
-meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
-    version: 1.2
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.17
