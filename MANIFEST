@@ -5,9 +5,15 @@ certs/test-ca.pem
 Changes
 Makefile.PL
 MANIFEST
+MANIFEST.SKIP
+META.yml			Module meta-data (added by MakeMaker)
 README
 SSL.pm
 t/loadmodule.t
-t/testmodule.t
+t/pod.t
+t/post.t
+t/post500k
+t/post66k
+t/post67k
 t/ssl_settings.req
-META.yml                                 Module meta-data (added by MakeMaker)
+t/testmodule.t

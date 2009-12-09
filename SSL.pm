@@ -72,7 +72,7 @@ use vars qw($VERSION @ISA $PROTO $DEBUG);
 use IO::Socket::SSL;
 use HTTP::Daemon;
 
-$VERSION = "1.04";
+$VERSION = "1.05_01";
 @ISA = qw(IO::Socket::SSL HTTP::Daemon);
 
 =item $d = new HTTP::Daemon::SSL
@@ -160,6 +160,44 @@ use vars qw(@ISA $DEBUG);
 @ISA = qw(IO::Socket::SSL HTTP::Daemon::ClientConn);
 *DEBUG = \$HTTP::Daemon::DEBUG;
 
+sub _need_more
+{
+    my $self = shift;
+    if ($_[1]) {
+        my($timeout, $fdset) = @_[1,2];
+        print STDERR "select(,,,$timeout)\n" if $DEBUG;
+        my $n = select($fdset,undef,undef,$timeout);
+        unless ($n) {
+            $self->reason(defined($n) ? "Timeout" : "select: $!");
+            return;
+        }
+    }
+    my $total = 0;
+    while (1){
+        print STDERR sprintf("sysread() already %d\n",$total) if $DEBUG;
+        my $n = sysread($self, $_[0], 2048, length($_[0]));
+        print STDERR sprintf("sysread() just \$n=%s\n",(defined $n?$n:'undef')) if $DEBUG;
+        $total += $n if defined $n;
+        last if $! =~ 'Resource temporarily unavailable';
+            #SSL_Error because of aggressive reading
+ 
+        $self->reason(defined($n) ? "Client closed" : "sysread: $!") unless $n;
+        last unless $n;
+        last unless $n == 2048;
+    }
+    $total;
+}
+
+
+=back
+
+=head1 BUGS
+
+There is a problem with the interaction between the L<HTTP::Daemon> base class and
+L<IO::Socket::SSL> buffering which causes large post or put actions (>66k or so,
+depending on your OS) to hang.
+
+See L<https://rt.cpan.org/Ticket/Display.html?id=52602>.
 
 =head1 SEE ALSO
 
@@ -167,10 +205,13 @@ RFC 2068
 
 L<IO::Socket::SSL>, L<HTTP::Daemon>, L<Apache>
 
+Github repository: L<http://github.com/aufflick/p5-http-daemon-ssl>
+
 =head1 COPYRIGHT
 
 Code and documentation from HTTP::Daemon Copyright 1996-2001, Gisle Aas
 Changes Copyright 2003-2004, Peter Behroozi
+Changes Copyright 2007-2009, Mark Aufflick C<< <mark@aufflick.com> >>
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
